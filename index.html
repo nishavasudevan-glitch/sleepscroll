@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#060a12" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>sleepscroll</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root { color-scheme: dark; }
+  html, body {
+    height: 100%;
+    background: #060a12;
+    overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  #sky { position: fixed; inset: 0; display: block; width: 100%; height: 100%; z-index: 1; }
+  #scroll {
+    position: fixed; inset: 0; z-index: 2;
+    overflow-y: scroll; overflow-x: hidden;
+    scrollbar-width: none; touch-action: none; overflow: hidden;
+  }
+  #scroll::-webkit-scrollbar { display: none; }
+  #flip {
+    position: fixed; top: max(14px, env(safe-area-inset-top)); left: 12px; z-index: 7;
+    width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(20,24,38,0.5);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    border: 0.5px solid rgba(180,190,220,0.15);
+    color: rgba(214,220,240,0.55); font-size: 15px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none;
+    transition: color 0.3s ease;
+  }
+  #flip:active { color: rgba(236,240,250,0.95); }
+
+  #intro {
+    position: fixed; inset: 0; z-index: 4;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; pointer-events: none; text-align: center;
+    transition: opacity 1.6s ease;
+  }
+  #intro .l1 { font-size: 22px; font-weight: 300; letter-spacing: 0.06em; color: rgba(233,235,246,0.90); }
+  #intro .l2 { font-size: 15px; font-weight: 300; letter-spacing: 0.05em; color: rgba(203,208,230,0.62); }
+  #intro .l3 { margin-top: 2px; font-size: 12px; font-weight: 300; letter-spacing: 0.30em; text-indent: 0.30em; color: rgba(180,186,214,0.34); }
+  #intro .l4 { margin-top: 16px; font-size: 13px; font-weight: 300; letter-spacing: 0.10em; color: rgba(196,202,226,0.42); font-style: italic; }
+
+  #refresh {
+    position: fixed; left: 0; right: 0;
+    top: max(74px, calc(env(safe-area-inset-top) + 44px));
+    z-index: 4; text-align: center; pointer-events: none;
+    font-size: 13px; font-weight: 300; letter-spacing: 0.18em; text-indent: 0.18em;
+    color: rgba(198,204,228,0.85); opacity: 0; transition: opacity 1.4s ease;
+  }
+
+  #sheepPrompt {
+    position: fixed; left: 0; right: 0;
+    bottom: max(120px, calc(env(safe-area-inset-bottom) + 96px));
+    z-index: 4; text-align: center; pointer-events: none;
+    font-size: 14px; font-weight: 300; letter-spacing: 0.24em; text-indent: 0.24em;
+    color: rgba(214,220,240,0.72); opacity: 0; transition: opacity 1.6s ease;
+  }
+  #dotsPrompt {
+    position: fixed; left: 0; right: 0;
+    bottom: max(160px, calc(env(safe-area-inset-bottom) + 132px));
+    z-index: 4; text-align: center; pointer-events: none;
+    font-size: 14px; font-weight: 300; letter-spacing: 0.20em; text-indent: 0.20em;
+    color: rgba(214,220,240,0.8);
+    opacity: 0; transform: translateY(20px);
+    transition: opacity 1.8s ease, transform 1.8s ease;
+  }
+  #dotsPrompt.show { opacity: 0.82; transform: translateY(0); }
+  #scrollPrompt {
+    position: fixed; left: 0; right: 0;
+    bottom: max(120px, calc(env(safe-area-inset-bottom) + 96px));
+    z-index: 4; text-align: center; pointer-events: none;
+    font-size: 14px; font-weight: 300; letter-spacing: 0.24em; text-indent: 0.24em;
+    color: rgba(214,220,240,0.7); opacity: 0; transition: opacity 1.8s ease;
+  }
+
+  #dms {
+    position: fixed; top: max(14px, env(safe-area-inset-top)); right: 12px; z-index: 6;
+    display: flex; flex-direction: column; gap: 8px; align-items: flex-end;
+    pointer-events: none; width: min(320px, 78vw);
+  }
+  .dm {
+    width: 100%; display: flex; gap: 10px; align-items: flex-start;
+    padding: 11px 13px; border-radius: 18px;
+    background: rgba(20,24,38,0.62);
+    -webkit-backdrop-filter: blur(18px) saturate(1.1); backdrop-filter: blur(18px) saturate(1.1);
+    border: 0.5px solid rgba(180,190,220,0.12);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+    transform: translateX(24px); opacity: 0;
+    transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2,0.8,0.2,1);
+  }
+  .dm.show { opacity: 1; transform: translateX(0); }
+  .dm .av { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; margin-top: 1px; }
+  .dm .body { min-width: 0; }
+  .dm .top { display: flex; align-items: baseline; gap: 7px; font-size: 13px; line-height: 1.2; }
+  .dm .from { font-weight: 600; color: rgba(236,238,248,0.94); letter-spacing: 0.01em; }
+  .dm .when { font-size: 11px; color: rgba(190,196,220,0.45); font-weight: 400; }
+  .dm .msg { margin-top: 2px; font-size: 13.5px; line-height: 1.35; font-weight: 300; color: rgba(214,219,238,0.82); }
+
+  #end {
+    position: fixed; inset: 0; z-index: 8;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 18px; background: #04060b; opacity: 0; pointer-events: none;
+    transition: opacity 3.5s ease; text-align: center; padding: 0 32px;
+  }
+  #end.on { opacity: 1; pointer-events: auto; }
+  #end .e1 { font-size: 20px; font-weight: 300; letter-spacing: 0.34em; text-indent: 0.34em; color: rgba(214,219,238,0); transition: opacity 2.4s ease; }
+  #end .e2 { font-size: 13px; font-weight: 300; letter-spacing: 0.10em; color: rgba(170,178,206,0); transition: opacity 2.4s ease; }
+  #end .over {
+    margin-top: 10px; font: 400 12px/1 system-ui, sans-serif; letter-spacing: 0.16em; text-indent: 0.16em;
+    color: rgba(150,160,196,0); background: none; border: 0.5px solid rgba(150,160,196,0);
+    border-radius: 999px; padding: 9px 20px;
+    transition: opacity 2s ease, border-color 2s ease, color 0.3s ease;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  #end .over:active { color: rgba(210,216,236,0.95); }
+
+  @media (prefers-reduced-motion: reduce) { .dm { transition: opacity 0.6s ease; transform: none; } }
+</style>
+</head>
+<body>
+  <canvas id="sky"></canvas>
+  <div id="scroll"></div>
+  <div id="flip" title="flip scroll direction">⇅</div>
+
+  <div id="intro">
+    <div class="l1">scroll till you sleep</div>
+    <div class="l2">double tap for dopamine</div>
+    <div class="l3">nothing happens next</div>
+    <div class="l4">the sky does things. so can you.</div>
+  </div>
+  <div id="refresh">the sky doesn't refresh</div>
+  <div id="sheepPrompt">tap to count the sheep</div>
+  <div id="dotsPrompt">join the dots</div>
+  <div id="scrollPrompt">keep scrolling</div>
+
+  <div id="dms"></div>
+
+  <div id="end">
+    <div class="e1">lights out</div>
+    <div class="e2">this scroll wasn't infinite</div>
+    <button class="over" id="over">start over</button>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+
+  const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const cv = document.getElementById("sky");
+  const ctx = cv.getContext("2d", { alpha: false });
+  const scroller = document.getElementById("scroll");
+  const introEl = document.getElementById("intro");
+  const refreshEl = document.getElementById("refresh");
+  const dmsEl = document.getElementById("dms");
+  const endEl = document.getElementById("end");
+  const sheepPrompt = document.getElementById("sheepPrompt");
+  const dotsPrompt = document.getElementById("dotsPrompt");
+  function showDotsPrompt(b) { dotsPrompt.classList.toggle("show", b); }
+
+  const DPR = Math.min(2, window.devicePixelRatio || 1);
+  let W = 0, H = 0;
+
+  // ---- colour drift: four nocturnal skies we crossfade through as you scroll ----
+  const SKIES = [
+    [[0,[6,10,18]],[0.34,[18,26,43]],[0.60,[43,51,72]],[0.82,[70,76,101]],[1,[120,124,151]]],   // indigo
+    [[0,[5,12,16]],[0.34,[14,30,38]],[0.60,[30,56,64]],[0.82,[52,84,92]],[1,[104,140,146]]],     // deep teal
+    [[0,[12,8,16]],[0.34,[30,20,40]],[0.60,[58,42,68]],[0.82,[92,72,100]],[1,[142,120,150]]],    // dusky plum
+    [[0,[8,9,20]],[0.34,[22,24,48]],[0.60,[46,46,80]],[0.82,[74,72,110]],[1,[120,118,158]]],     // blue-violet
+  ];
+  const COLOR_PERIOD = 2600; // scroll px per sky; full cycle = 4x this
+
+  const STAR_COOL = [214, 222, 244];
+  const STAR_WARM = [240, 226, 196];
+  const CLOUD_HI = [174, 184, 214];
+  const CLOUD_LO = [24, 30, 48];
+  const GOLD = [244, 199, 69];
+  const WOOL = [238, 232, 214], WOOL_HI = [251, 247, 236], WOOL_LO = [212, 204, 186];
+  const FACE = [38, 42, 56];
+
+  let START = performance.now();
+  let ended = false;
+
+  // dimming: bright until the 1-min mark, then a steady, noticeable deepening
+  // every minute, quite dark by ~9, full dark (lights out) at 12
+  function sleepiness() {
+    const m = (performance.now() - START) / 60000;
+    if (m <= 1) return 0;
+    const s = Math.min(1, (m - 1) / 11);
+    return Math.pow(s, 0.82);   // slight front-load so it reads early
+  }
+  function light() { return 1 - sleepiness() * 0.78; }
+  function timeScale() { return 0.45 + (1 - sleepiness()) * 0.55; }
+
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  let skyOffset = 0;
+  let scrollDir = -1;          // flipped default (most people found the old way reversed); toggle flips it
+  try { const sd = localStorage.getItem("ss_dir"); if (sd) scrollDir = parseInt(sd, 10) || -1; } catch (e) {}
+  let stars = [], clouds = [], bursts = [];
+  let comet = null;
+  let flock = null;            // { sheep:[], dir }
+  let planets = [];            // iridescent worlds pinned in the sky, to be discovered
+  let skyLabels = [];          // "you just discovered X" notes that rise and fade
+  let sheepCount = 0;          // resets each flock; no score kept
+  let floatNums = [];          // the counted numbers drifting up and away
+  let activeCon = null;        // the constellation currently being traced
+  let doneCons = [];           // constellations completed this session (persist till reload)
+
+  function buildScene() {
+    const band = H + 320;
+    const rng = mulberry32(20260708);
+
+    stars = [];
+    const layers = REDUCED
+      ? [{ n: 90, d: 0.18, s: [0.5, 1.1], sp: false }, { n: 46, d: 0.42, s: [0.9, 1.8], sp: true }, { n: 16, d: 0.75, s: [1.4, 2.6], sp: true }]
+      : [{ n: 150, d: 0.18, s: [0.5, 1.2], sp: false }, { n: 72, d: 0.42, s: [0.9, 2.0], sp: true }, { n: 30, d: 0.78, s: [1.6, 3.2], sp: true }];
+    for (const L of layers) {
+      for (let i = 0; i < L.n; i++) {
+        const big = L.sp && rng() < 0.5;
+        stars.push({
+          x: rng() * W, y: rng() * band, depth: L.d,
+          r: L.s[0] + rng() * (L.s[1] - L.s[0]),
+          spark: big, base: 0.35 + rng() * 0.55,
+          ph: rng() * Math.PI * 2,
+          tw: 0.5 + rng() * 1.9,          // wider speed spread
+          warm: rng() < 0.12, fade: rng(),
+          flare: 0,                        // occasional pop
+        });
+      }
+    }
+
+    clouds = [];
+    const cn = REDUCED ? 3 : 5;
+    for (let i = 0; i < cn; i++) {
+      const cx = rng() * W, cy = rng() * (H + 600), scale = 0.8 + rng() * 1.1;
+      const puffs = [], pn = 4 + Math.floor(rng() * 4);
+      for (let j = 0; j < pn; j++) puffs.push({ dx: (rng() - 0.5) * 260 * scale, dy: (rng() - 0.5) * 90 * scale, r: (70 + rng() * 120) * scale });
+      clouds.push({ x: cx, y: cy, depth: 0.5, drift: (rng() < 0.5 ? -1 : 1) * (2 + rng() * 4), alpha: 0.10 + rng() * 0.12, warm: rng() < 0.3, puffs });
+    }
+  }
+
+  function resize() {
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = Math.floor(W * DPR); cv.height = Math.floor(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    buildScene();
+  }
+
+  // ---- colour-drift gradient ----
+  function skyGradient(s) {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    const k = 1 - s * 0.86;
+    const ph = (skyOffset / COLOR_PERIOD);
+    const seg = ((ph % SKIES.length) + SKIES.length) % SKIES.length;
+    const i0 = Math.floor(seg) % SKIES.length;
+    const i1 = (i0 + 1) % SKIES.length;
+    const f = seg - Math.floor(seg);
+    const A = SKIES[i0], B = SKIES[i1];
+    for (let j = 0; j < A.length; j++) {
+      const pos = A[j][0], ca = A[j][1], cb = B[j][1];
+      const r = (ca[0] + (cb[0] - ca[0]) * f) * k;
+      const gg = (ca[1] + (cb[1] - ca[1]) * f) * k;
+      const b = (ca[2] + (cb[2] - ca[2]) * f) * k;
+      g.addColorStop(pos, `rgb(${r | 0},${gg | 0},${b | 0})`);
+    }
+    return g;
+  }
+
+  function drawSparkle(x, y, r, a, col) {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r * 3.4);
+    g.addColorStop(0, `rgba(${col[0]},${col[1]},${col[2]},${a * 0.5})`);
+    g.addColorStop(1, `rgba(${col[0]},${col[1]},${col[2]},0)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(x - r * 3.4, y - r * 3.4, r * 6.8, r * 6.8);
+    const i = r * 0.30;
+    ctx.beginPath();
+    ctx.moveTo(x, y - r); ctx.lineTo(x + i, y - i); ctx.lineTo(x + r, y); ctx.lineTo(x + i, y + i);
+    ctx.lineTo(x, y + r); ctx.lineTo(x - i, y + i); ctx.lineTo(x - r, y); ctx.lineTo(x - i, y - i);
+    ctx.closePath();
+    ctx.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},${a})`;
+    ctx.fill();
+  }
+
+  function drawStars(t, s, lite) {
+    const band = H + 320;
+    for (const st of stars) {
+      if (st.fade < s * 0.5) continue;
+      let sy = (st.y + skyOffset * st.depth) % band;
+      if (sy < 0) sy += band;
+      sy -= 160;
+      if (sy < -80 || sy > H + 80) continue;
+
+      // occasional flare
+      if (st.flare > 0) st.flare *= 0.90;
+      if (!REDUCED && st.spark && Math.random() < 0.0007) st.flare = 1;
+
+      const tw = 0.5 + 0.5 * Math.sin(t * st.tw + st.ph);
+      const a = Math.min(1, (st.base * tw + st.flare * 0.6) * lite);
+      if (a <= 0.01) continue;
+      const col = st.warm ? STAR_WARM : STAR_COOL;
+
+      if (st.spark || st.flare > 0.2) {
+        drawSparkle(st.x, sy, st.r + st.flare * 2, a, col);
+      } else {
+        const g = ctx.createRadialGradient(st.x, sy, 0, st.x, sy, st.r * 2.6);
+        g.addColorStop(0, `rgba(${col[0]},${col[1]},${col[2]},${a})`);
+        g.addColorStop(1, `rgba(${col[0]},${col[1]},${col[2]},0)`);
+        ctx.fillStyle = g;
+        ctx.fillRect(st.x - st.r * 2.6, sy - st.r * 2.6, st.r * 5.2, st.r * 5.2);
+      }
+    }
+  }
+
+  function drawClouds(s, lite) {
+    const band = H + 800;
+    const veil = 0.5 + lite * 0.5;
+    for (const cl of clouds) {
+      cl.x += cl.drift * 0.02 * timeScale();
+      if (cl.x < -400) cl.x = W + 400; else if (cl.x > W + 400) cl.x = -400;
+      let cy = (cl.y + skyOffset * cl.depth) % band;
+      if (cy < 0) cy += band;
+      cy -= 400;
+      const hi = cl.warm ? [206, 188, 168] : CLOUD_HI;
+      for (const p of cl.puffs) {
+        const px = cl.x + p.dx, py = cy + p.dy;
+        if (py < -p.r || py > H + p.r) continue;
+        let g = ctx.createRadialGradient(px, py, 0, px, py, p.r);
+        g.addColorStop(0, `rgba(${CLOUD_LO[0]},${CLOUD_LO[1]},${CLOUD_LO[2]},${cl.alpha * 1.4 * veil})`);
+        g.addColorStop(1, `rgba(${CLOUD_LO[0]},${CLOUD_LO[1]},${CLOUD_LO[2]},0)`);
+        ctx.fillStyle = g;
+        ctx.fillRect(px - p.r, py - p.r, p.r * 2, p.r * 2);
+        const hx = px, hy = py - p.r * 0.32, hr = p.r * 0.7;
+        g = ctx.createRadialGradient(hx, hy, 0, hx, hy, hr);
+        g.addColorStop(0, `rgba(${hi[0]},${hi[1]},${hi[2]},${cl.alpha * veil})`);
+        g.addColorStop(1, `rgba(${hi[0]},${hi[1]},${hi[2]},0)`);
+        ctx.fillStyle = g;
+        ctx.fillRect(hx - hr, hy - hr, hr * 2, hr * 2);
+      }
+    }
+  }
+
+  function maybeComet(s) {
+    if (comet || s > 0.8) return;
+    if (flock || createCand || creating) return;   // never streak across another moment
+    if (Math.random() < 0.00006) {                   // rare, pure chance
+      const fromLeft = Math.random() < 0.5;
+      const x = fromLeft ? -60 : W + 60;
+      const y = 40 + Math.random() * H * 0.4;
+      const ang = (0.35 + Math.random() * 0.25);
+      const sp = 7 + Math.random() * 4;
+      comet = { x, y, vx: Math.cos(ang) * sp * (fromLeft ? 1 : -1), vy: Math.sin(ang) * sp, life: 0, max: 150 };
+    }
+  }
+  function drawComet(lite) {
+    if (!comet) return;
+    comet.life++;
+    comet.x += comet.vx * timeScale();
+    comet.y += comet.vy * timeScale();
+    const fade = comet.life < 20 ? comet.life / 20 : comet.life > comet.max - 30 ? Math.max(0, (comet.max - comet.life) / 30) : 1;
+    const a = fade * lite;
+    const tx = comet.x - comet.vx * 9, ty = comet.y - comet.vy * 9;
+    const g = ctx.createLinearGradient(comet.x, comet.y, tx, ty);
+    g.addColorStop(0, `rgba(${GOLD[0]},${GOLD[1]},${GOLD[2]},${0.55 * a})`);
+    g.addColorStop(1, `rgba(${GOLD[0]},${GOLD[1]},${GOLD[2]},0)`);
+    ctx.strokeStyle = g; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(comet.x, comet.y); ctx.lineTo(tx, ty); ctx.stroke();
+    drawSparkle(comet.x, comet.y, 3.4, 0.95 * a, [255, 240, 210]);
+    if (comet.life > comet.max || comet.x < -120 || comet.x > W + 120 || comet.y > H + 120) comet = null;
+  }
+
+  // ---------- constellations you trace (the thing to scroll toward) ----------
+  const CON_TEMPLATES = [
+    [[-1,-0.3],[-0.5,-0.15],[0,-0.05],[0.45,0.05],[0.5,0.5],[0,0.62],[-0.05,0.15]],      // dipper / ladle
+    [[-1,0.35],[-0.5,-0.45],[0,0.25],[0.5,-0.45],[1,0.35]],                               // W (cassiopeia)
+    [[0,-1],[0.6,0],[0,1],[-0.6,0],[0,-1]],                                               // diamond / kite
+    [[-0.95,0.3],[-0.5,-0.4],[0,-0.6],[0.5,-0.4],[0.95,0.3]],                             // crown / arc
+    [[-0.9,-0.5],[-0.3,0.1],[0.1,-0.3],[0.7,0.5]],                                        // zigzag
+    [[-0.4,-0.65],[0.25,-0.6],[0.5,-0.1],[0.1,0.3],[0.15,0.75]],                          // hook
+    [[0,-0.7],[0.4,-0.4],[0.4,0.1],[0,0.4],[-0.4,0.1],[-0.4,-0.4],[0,-0.7],[0,0.95]],     // lollipop (loop + stick)
+    [[-0.9,-0.4],[-0.3,-0.12],[0.3,0.12],[0.9,0.4]],                                      // long line / wand
+    [[-0.55,-0.7],[-0.55,0.25],[0.6,0.25],[0.6,0.65]],                                    // chair / L
+    [[-0.7,0.55],[0.7,0.55],[0,-0.7],[-0.7,0.55]],                                        // triangle
+    [[-0.7,-0.6],[0.6,-0.55],[-0.45,0.6],[0.65,0.65]],                                    // bowtie / hourglass
+  ];
+  const CON_NAMES = [
+    "eye in the sky", "the last cigarette", "pie in the sky", "leftover cake", "lollipop",
+    "toadstool major", "cauldron minor", "beer on a warm day", "hot chocolate", "page turner", "Melissa",
+    "midnight snack", "the last slice", "buttered toast", "two-minute noodles", "chai before bed",
+    "filter coffee", "leftover biryani", "the good biscuit", "warm milk", "honey on a spoon",
+    "cake for breakfast", "the last fry in the bag", "the warm side of the pillow", "clean sheets",
+    "a stolen blanket", "fresh socks", "the good hoodie", "someone else's jumper", "a hot water bottle",
+    "the heavy blanket", "one more episode", "rain on the window", "the second alarm", "sunday morning",
+    "nap weather", "the long bath", "slippers by the door", "a fed cat", "a sleeping dog", "the kettle's on",
+    "an old voicemail", "the last day of a holiday", "a childhood smell", "your grandmother's kitchen",
+    "a song you forgot you loved", "the first cold day", "a letter you kept", "home before it changed",
+    "snooze o'clock", "the horizontal life",
+  ];
+  // iridescent little worlds you chance upon
+  const PLANET_NAMES = [
+    "where the lost things go", "where the unsent texts live", "where tuesday went",
+    "where the odd socks end up", "where the good ideas run off to", "where the almost-said things go",
+    "where the snooze button leads", "where the group chats go quiet", "where the half-read books wait",
+    "where the missing pens retire", "where the leftover dreams go", "where the read receipts hide",
+    "where the overthinking stops", "the planet of left socks", "the graveyard of ideas",
+    "the graveyard of new year's resolutions", "the home of the greatest burger", "the home of the one that got away",
+    "the land of nearly", "the home of the perfect nap", "the planet of forgotten passwords",
+    "the land of left-on lights", "the home of every unsent draft", "the home of the missing remote",
+    "somewhere soft", "somewhere quiet", "somewhere safe", "somewhere silly", "somewhere slow",
+    "somewhere kind", "somewhere warm", "somewhere dim", "somewhere gentle", "somewhere far",
+    "somewhere easy", "somewhere still", "somewhere sleepy", "somewhere unhurried", "somewhere off the map",
+    "somewhere without a clock", "somewhere the lights are low", "somewhere no one needs you",
+    "somewhere you can stop", "somewhere to put it down", "somewhere nothing is due",
+    "somewhere you left the lights on", "somewhere the phone can't reach", "somewhere to lay it down",
+    "somewhere that waited up for you", "somewhere good to stop",
+  ];
+  let planetBag = [], lastPlanetName = null;
+  function nextPlanetName() {
+    if (!planetBag.length) {
+      planetBag = PLANET_NAMES.slice();
+      for (let i = planetBag.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0;[planetBag[i], planetBag[j]] = [planetBag[j], planetBag[i]]; }
+      if (planetBag[planetBag.length - 1] === lastPlanetName && planetBag.length > 1) { const t = planetBag[0]; planetBag[0] = planetBag[planetBag.length - 1]; planetBag[planetBag.length - 1] = t; }
+    }
+    return (lastPlanetName = planetBag.pop());
+  }
+  let nameBag = [], lastConName = null;
+  function nextName() {
+    if (!nameBag.length) {
+      nameBag = CON_NAMES.slice();
+      for (let i = nameBag.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0;[nameBag[i], nameBag[j]] = [nameBag[j], nameBag[i]]; }
+      if (nameBag[nameBag.length - 1] === lastConName && nameBag.length > 1) { const t = nameBag[0]; nameBag[0] = nameBag[nameBag.length - 1]; nameBag[nameBag.length - 1] = t; }
+    }
+    return (lastConName = nameBag.pop());
+  }
+
+  function spawnConstellation() {
+    if (activeCon || ended || sleepiness() > 0.78) return;
+    const tpl = CON_TEMPLATES[(Math.random() * CON_TEMPLATES.length) | 0];
+    const scale = Math.min(W, H) * (0.15 + Math.random() * 0.06);
+    const cx = W * (0.28 + Math.random() * 0.44);
+    const cyScreen = H * (0.30 + Math.random() * 0.28);
+    const pts = tpl.map(([dx, dy]) => ({ dx: dx * scale, dy: dy * scale, ph: Math.random() * 6.28 }));
+    activeCon = { x: cx, screenY: cyScreen, worldY: 0, done: false, pts, name: nextName(), next: 0, born: clock };
+    showDotsPrompt(true);
+  }
+
+  // active constellations sit still on screen (waiting to be traced);
+  // once done they pin to the sky and drift with everything else
+  function conDot(con, i) {
+    const baseY = con.done ? (con.worldY + skyOffset) : con.screenY;
+    return { x: con.x + con.pts[i].dx, y: baseY + con.pts[i].dy };
+  }
+
+  function tryConnect(x, y) {
+    if (!activeCon) return false;
+    const p = conDot(activeCon, activeCon.next);
+    if (Math.hypot(x - p.x, y - p.y) < 42) {
+      activeCon.next++;
+      // per-touch reward: soft, flat, empty — same every time, no jackpot on completion
+      bursts.push({ x: p.x, worldY: p.y - skyOffset, born: clock, intensity: 0.5 * light(), ph: Math.random() * 6.28 });
+      const v = Math.round(10 * light()); if (v > 0 && navigator.vibrate) navigator.vibrate(v);
+      if (activeCon.next >= activeCon.pts.length) completeConstellation();
+      return true;
+    }
+    return false;
+  }
+
+  function completeConstellation() {
+    const c = activeCon; activeCon = null;
+    c.done = true;
+    c.worldY = c.screenY - skyOffset;   // freeze where it was, now drifts with the sky
+    c.nameRise = 0;
+    doneCons.push(c);
+    if (doneCons.length > 20) doneCons.shift();
+    showDotsPrompt(false);
+  }
+
+  function drawConLines(con, upto, a) {
+    if (upto < 2) return;
+    ctx.strokeStyle = `rgba(210,220,244,${a})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i < upto; i++) { const p = conDot(con, i); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); }
+    ctx.stroke();
+  }
+
+  function drawActiveCon(t, lite) {
+    if (!activeCon) return;
+    const con = activeCon;
+    showDotsPrompt(true);   // it waits on screen until traced
+    drawConLines(con, con.next, 0.62 * lite);
+    for (let i = 0; i < con.pts.length; i++) {
+      const p = conDot(con, i);
+      if (i < con.next) drawSparkle(p.x, p.y, 3.8, Math.min(1, 1.0 * lite), [234, 240, 255]);
+      else {
+        const isNext = i === con.next;
+        const pulse = 0.5 + 0.5 * Math.sin(t * 2.2 + con.pts[i].ph);
+        const a = (isNext ? 1.0 : 0.72) * (0.55 + 0.45 * pulse) * lite;
+        drawSparkle(p.x, p.y, isNext ? 5.4 : 3.6, Math.min(1, a), [255, 238, 200]);
+      }
+    }
+  }
+
+  function drawDoneCons(t, lite) {
+    for (const con of doneCons) {
+      const warm = con.warm;
+      const lineCol = warm ? "255,220,150" : "210,220,244";
+      const starCol = warm ? [255, 226, 170] : [224, 232, 250];
+      const a = 0.5 * lite;
+      const center = con.worldY + skyOffset;
+      if (center < -H * 0.5 || center > H * 1.5) continue;
+      // lines
+      if (con.pts.length >= 2) {
+        ctx.strokeStyle = `rgba(${lineCol},${a})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let i = 0; i < con.pts.length; i++) { const p = conDot(con, i); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); }
+        if (con.closed && con.pts.length > 2) { const p0 = conDot(con, 0); ctx.lineTo(p0.x, p0.y); }
+        ctx.stroke();
+      }
+      for (let i = 0; i < con.pts.length; i++) { const p = conDot(con, i); drawSparkle(p.x, p.y, 3.0, a, starCol); }
+      if (con.nameRise < 1) con.nameRise = Math.min(1, con.nameRise + 0.018);
+      const baseY = con.worldY + skyOffset;
+      const minDy = Math.min(...con.pts.map(p => p.dy));
+      const settleY = baseY + minDy - 18;
+      const fromY = baseY + H * 0.4;
+      const ny = fromY + (settleY - fromY) * con.nameRise;
+      const label = "this constellation is called " + con.name;
+      ctx.font = "italic 300 14px system-ui";
+      ctx.textAlign = "center";
+      const marginX = Math.max(22, W * 0.06);
+      const halfW = Math.min(ctx.measureText(label).width, W - marginX * 2) / 2 + 4;
+      const nx = Math.min(Math.max(con.x, marginX + halfW), W - marginX - halfW);
+      ctx.fillStyle = `rgba(246,224,176,${0.6 * lite * con.nameRise})`;
+      ctx.fillText(label, nx, ny);
+      ctx.textAlign = "left";
+    }
+  }
+
+  // ---------- constellations you create ----------
+  let createCand = null;   // an offered cluster of your placed stars
+  let creating = null;     // { stars:[...], order:[...] } being traced
+  function onScreenBurst(b) { const sy = b.worldY + skyOffset; return sy > -20 && sy < H + 20; }
+  function checkCluster() {
+    if (creating) return;
+    const set = bursts.filter(b => !b.used && onScreenBurst(b));
+    if (set.length >= 3) {
+      if (createCand) { createCand.stars = set; createCand.born = clock; }
+      else createCand = { stars: set, born: clock };
+      showDotsPrompt(true);
+    }
+  }
+  function tryConnectCreate(x, y) {
+    const set = creating ? creating.stars : (createCand ? createCand.stars : null);
+    if (!set) return false;
+    for (const b of set) {
+      const sy = b.worldY + skyOffset;
+      if (Math.hypot(x - b.x, y - sy) < 42) {
+        if (!creating) { creating = { stars: createCand.stars, order: [] }; createCand = null; }
+        if (creating.order.indexOf(b) !== -1) return true;   // already joined
+        creating.order.push(b);
+        const v = Math.round(10 * light()); if (v > 0 && navigator.vibrate) navigator.vibrate(v);
+        if (creating.order.length >= creating.stars.length) completeCreate();
+        return true;
+      }
+    }
+    return false;
+  }
+  function completeCreate() {
+    const stars = creating.order;
+    let cx = 0, cwy = 0;
+    for (const b of stars) { cx += b.x; cwy += b.worldY; }
+    cx /= stars.length; cwy /= stars.length;
+    const pts = stars.map(b => ({ dx: b.x - cx, dy: b.worldY - cwy, ph: Math.random() * 6.28 }));
+    const name = nextName();
+    doneCons.push({ x: cx, worldY: cwy, done: true, warm: true, closed: !!creating.closed, pts, name, nameRise: 0 });
+    if (doneCons.length > 24) doneCons.shift();
+    for (const b of stars) b.used = true;
+    creating = null;
+    showDotsPrompt(false);
+  }
+  function drawCreate(t, lite) {
+    // let an ignored offer lapse
+    if (createCand && !creating) {
+      const anyOn = createCand.stars.some(onScreenBurst);
+      if (clock - createCand.born > 16 || !anyOn) { createCand = null; showDotsPrompt(false); return; }
+    }
+    const set = creating ? creating.stars : (createCand ? createCand.stars : null);
+    if (!set) return;
+    if (creating && creating.order.length > 1) {
+      ctx.strokeStyle = `rgba(255,220,150,${0.6 * lite})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      creating.order.forEach((b, i) => { const sy = b.worldY + skyOffset; i ? ctx.lineTo(b.x, sy) : ctx.moveTo(b.x, sy); });
+      ctx.stroke();
+    }
+    for (const b of set) {
+      const sy = b.worldY + skyOffset;
+      const joined = creating && creating.order.indexOf(b) !== -1;
+      const pulse = 0.5 + 0.5 * Math.sin(t * 2.4 + (b.ph || 0));
+      const a = Math.min(1, (joined ? 0.95 : 0.55 + 0.45 * pulse) * lite);
+      drawSparkle(b.x, sy, joined ? 3.4 : 4.6, a, [255, 232, 172]);
+    }
+  }
+
+  function drawBursts(t, lite) {
+    for (const b of bursts) {
+      if (b.used) continue;   // absorbed into a created constellation, drawn there instead
+      const sy = b.worldY + skyOffset;
+      if (sy < -60 || sy > H + 60) continue;
+      const age = t - b.born;
+      const grow = Math.min(1, age / 0.55);
+      const ease = 1 - Math.pow(1 - grow, 3);
+      const bright = b.intensity * lite;
+      const R = 26 * ease * (0.6 + b.intensity * 0.4);
+      if (grow < 1) {
+        const ga = (1 - grow) * 0.5 * bright;
+        const g = ctx.createRadialGradient(b.x, sy, 0, b.x, sy, R * 2.2);
+        g.addColorStop(0, `rgba(${GOLD[0]},${GOLD[1]},${GOLD[2]},0)`);
+        g.addColorStop(0.7, `rgba(${GOLD[0]},${GOLD[1]},${GOLD[2]},${ga})`);
+        g.addColorStop(1, `rgba(${GOLD[0]},${GOLD[1]},${GOLD[2]},0)`);
+        ctx.fillStyle = g;
+        ctx.fillRect(b.x - R * 2.2, sy - R * 2.2, R * 4.4, R * 4.4);
+      }
+      const coreR = 2.2 + b.intensity * 1.8;
+      const tw = 0.7 + 0.3 * Math.sin(t * 0.8 + b.ph);
+      drawSparkle(b.x, sy, coreR, Math.min(1, bright * tw * 1.1), [255, 224, 168]);
+    }
+  }
+
+  // ---------- sheep ----------
+  function softBlob(x, y, r, col, a) {
+    ctx.beginPath();
+    ctx.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},${a})`;
+    ctx.arc(x, y, r, 0, 6.283);
+    ctx.fill();
+  }
+  function drawSheep(sh, lite) {
+    const { x, y, s, dir, wonky } = sh;
+    const a = lite;
+    ctx.save();
+    ctx.translate(x, y);
+    if (wonky === "upside") ctx.scale(1, -1);
+    ctx.scale(dir, 1); // face travel direction
+    const w = 16 * s;
+
+    // legs
+    ctx.fillStyle = `rgba(${FACE[0]},${FACE[1]},${FACE[2]},${a})`;
+    for (const lx of [-w * 0.45, -w * 0.1, w * 0.25]) {
+      ctx.fillRect(lx, w * 0.35, w * 0.12, w * 0.5);
+    }
+    // wool body (lumpy)
+    const puffs = [[-w * 0.5, 0, w * 0.42], [-w * 0.15, -w * 0.18, w * 0.5], [w * 0.2, -w * 0.05, w * 0.46], [-w * 0.1, w * 0.18, w * 0.44], [w * 0.05, -w * 0.28, w * 0.34]];
+    for (const [px, py, pr] of puffs) softBlob(px, py, pr, WOOL_LO, a);
+    for (const [px, py, pr] of puffs) softBlob(px - pr * 0.12, py - pr * 0.14, pr * 0.9, WOOL, a);
+    for (const [px, py, pr] of puffs) softBlob(px - pr * 0.2, py - pr * 0.25, pr * 0.55, WOOL_HI, a * 0.9);
+
+    // head
+    const hx = w * 0.6, hy = w * 0.02, hr = w * 0.3;
+    ctx.fillStyle = `rgba(${FACE[0]},${FACE[1]},${FACE[2]},${a})`;
+    ctx.beginPath(); ctx.ellipse(hx, hy, hr, hr * 0.92, 0, 0, 6.283); ctx.fill();
+    // ear
+    if (wonky === "dog") {
+      ctx.beginPath(); ctx.moveTo(hx - hr * 0.2, -hr * 0.7); ctx.lineTo(hx - hr * 0.7, -hr * 1.5); ctx.lineTo(hx + hr * 0.1, -hr * 0.9); ctx.closePath(); ctx.fill();
+    } else {
+      ctx.beginPath(); ctx.ellipse(hx - hr * 0.5, -hr * 0.5, hr * 0.28, hr * 0.5, -0.6, 0, 6.283); ctx.fill();
+    }
+    // sleepy face
+    if (wonky === "sunglasses") {
+      ctx.fillStyle = `rgba(10,12,18,${a})`;
+      ctx.fillRect(hx - hr * 0.1, hy - hr * 0.18, hr * 0.85, hr * 0.28);
+    } else {
+      ctx.strokeStyle = `rgba(${WOOL_HI[0]},${WOOL_HI[1]},${WOOL_HI[2]},${a * 0.85})`;
+      ctx.lineWidth = Math.max(1, w * 0.035);
+      ctx.beginPath(); ctx.arc(hx + hr * 0.2, hy - hr * 0.05, hr * 0.16, 0.2, Math.PI - 0.2); ctx.stroke(); // closed eye
+      ctx.beginPath(); ctx.arc(hx + hr * 0.45, hy + hr * 0.28, hr * 0.18, 0.1, 0.9); ctx.stroke();        // tiny smile
+    }
+    ctx.restore();
+
+    // asleep zzz above (screen space, not flipped)
+    if (wonky === "asleep") {
+      ctx.fillStyle = `rgba(230,236,252,${a * 0.7})`;
+      ctx.font = `${Math.round(10 * s)}px system-ui`;
+      ctx.fillText("z", x + 26 * s, y - 30 * s);
+      ctx.fillText("z", x + 34 * s, y - 40 * s);
+    }
+  }
+
+  function spawnFlock() {
+    if (flock || ended || sleepiness() > 0.82) return;
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    const n = 9 + Math.floor(Math.random() * 8);        // 9-16, a little drift of them
+    const baseY = H * (0.4 + Math.random() * 0.25);
+    const sheep = [];
+    const wonkyIdx = Math.random() < 0.5 ? Math.floor(Math.random() * n) : -1;
+    const wonkyKinds = ["sunglasses", "asleep", "dog", "upside"];
+    const speed = (14 + Math.random() * 12);
+    for (let i = 0; i < n; i++) {
+      const s = 0.5 + Math.random() * 0.4;              // much tinier
+      const gap = 70 + Math.random() * 90;              // spaced but streaming past
+      const startX = dir === 1 ? -40 - i * gap : W + 40 + i * gap;
+      sheep.push({
+        x: startX, y: baseY + (Math.random() - 0.5) * 150, s, dir,
+        vx: dir * speed * (0.85 + Math.random() * 0.3),
+        bob: Math.random() * 6.28, bobA: 2 + Math.random() * 4,
+        counted: false,
+        wonky: i === wonkyIdx ? wonkyKinds[Math.floor(Math.random() * wonkyKinds.length)] : null,
+      });
+    }
+    flock = { sheep, dir };
+    sheepCount = 0;
+    sheepPrompt.style.opacity = "0.72";
+  }
+  function updateFlock(dt, lite) {
+    if (!flock) return;
+    let alive = false;
+    for (const sh of flock.sheep) {
+      sh.x += sh.vx * dt * timeScale();
+      sh.bob += dt * 1.6;
+      const yy = sh.y + Math.sin(sh.bob) * (sh.bobA || 3);
+      sh._sx = sh.x; sh._sy = yy;   // remember for tap-to-count
+      if (sh.x > -120 && sh.x < W + 120) { alive = true; drawSheep({ ...sh, y: yy }, lite); }
+      else if ((flock.dir === 1 && sh.x <= W + 120) || (flock.dir === -1 && sh.x >= -120)) alive = true;
+    }
+    if (!alive) { flock = null; sheepCount = 0; sheepPrompt.style.opacity = "0"; }
+  }
+
+  function trySheep(x, y) {
+    if (!flock) return false;
+    for (const sh of flock.sheep) {
+      if (sh.counted || sh._sx == null) continue;
+      const r = Math.max(46, 26 * sh.s);
+      if (Math.hypot(x - sh._sx, y - sh._sy) < r) {
+        sh.counted = true;
+        sheepCount++;
+        floatNums.push({ x: sh._sx, y: sh._sy, n: sheepCount, born: clock });
+        const v = Math.round(8 * light()); if (v > 0 && navigator.vibrate) navigator.vibrate(v);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function drawFloatNums(lite) {
+    for (let i = floatNums.length - 1; i >= 0; i--) {
+      const f = floatNums[i];
+      const age = clock - f.born;
+      if (age > 2.4) { floatNums.splice(i, 1); continue; }
+      const p = age / 2.4;
+      const y = f.y - 6 - p * 46;
+      const a = (1 - p) * 0.9 * lite;
+      ctx.fillStyle = `rgba(230,236,252,${a})`;
+      ctx.font = "300 24px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(String(f.n), f.x, y);
+      ctx.textAlign = "left";
+    }
+  }
+
+  // ---------- planets you discover (iridescent, some ringed) ----------
+  function drawRing(cx, cy, R, tilt, a) {
+    const rx = R * 1.75, ry = Math.max(4, rx * (0.18 + Math.abs(tilt) * 0.28));
+    ctx.save();
+    ctx.translate(cx, cy); ctx.rotate(tilt);
+    const g = ctx.createLinearGradient(-rx, 0, rx, 0);
+    g.addColorStop(0, "rgba(200,180,220,0)");
+    g.addColorStop(0.5, `rgba(222,202,226,${0.5 * a})`);
+    g.addColorStop(1, "rgba(182,206,226,0)");
+    ctx.strokeStyle = g;
+    ctx.lineWidth = Math.max(1.5, R * 0.07);
+    ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, 6.283); ctx.stroke();
+    ctx.restore();
+  }
+  function drawPlanet(dt, lite) {
+    for (let idx = planets.length - 1; idx >= 0; idx--) {
+      const p = planets[idx];
+      p.hue += dt * 0.22;
+      p.bob += dt * 0.5;
+      const sy = p.worldY + skyOffset + Math.sin(p.bob) * 3;   // pinned to the sky, drifts with the stars
+      p._sx = p.x; p._sy = sy;
+      // free up any planet that has drifted well away (discovered or simply missed)
+      if (sy < -H * 1.6 || sy > H * 2.6) { planets.splice(idx, 1); continue; }
+      if (sy < -p.r - 60 || sy > H + p.r + 60) continue;
+      const fade = Math.min(1, (clock - p.born) / 1.5);         // ease in instead of popping
+      const R = p.r, a = 0.92 * lite * fade;
+      const x = p.x;
+
+      // outer glow
+      let g = ctx.createRadialGradient(x, sy, R * 0.6, x, sy, R * 2.0);
+      g.addColorStop(0, `rgba(190,205,240,${0.10 * a})`);
+      g.addColorStop(1, "rgba(190,205,240,0)");
+      ctx.fillStyle = g; ctx.fillRect(x - R * 2, sy - R * 2, R * 4, R * 4);
+
+      if (p.ring) drawRing(x, sy, R, p.tilt, a);
+
+      // body, clipped to the sphere
+      ctx.save();
+      ctx.beginPath(); ctx.arc(x, sy, R, 0, 6.283); ctx.clip();
+      g = ctx.createRadialGradient(x - R * 0.4, sy - R * 0.45, R * 0.1, x, sy, R * 1.15);
+      g.addColorStop(0, `rgba(224,232,246,${0.95 * a})`);
+      g.addColorStop(0.55, `rgba(150,172,220,${0.9 * a})`);
+      g.addColorStop(1, `rgba(58,72,120,${0.95 * a})`);
+      ctx.fillStyle = g; ctx.fillRect(x - R, sy - R, R * 2, R * 2);
+      // iridescent sheen: shifting opal blooms, additive
+      ctx.globalCompositeOperation = "lighter";
+      const opal = [[150, 185, 235], [224, 168, 210], [210, 196, 150], [168, 206, 204]];
+      for (let i = 0; i < opal.length; i++) {
+        const ph = p.hue + i * 1.7;
+        const ox = Math.cos(ph) * R * 0.4, oy = Math.sin(ph * 0.8) * R * 0.4;
+        const alpha = (0.10 + 0.06 * (Math.sin(ph) * 0.5 + 0.5)) * a;
+        const gg = ctx.createRadialGradient(x + ox, sy + oy, 0, x + ox, sy + oy, R * 1.1);
+        gg.addColorStop(0, `rgba(${opal[i][0]},${opal[i][1]},${opal[i][2]},${alpha})`);
+        gg.addColorStop(1, `rgba(${opal[i][0]},${opal[i][1]},${opal[i][2]},0)`);
+        ctx.fillStyle = gg; ctx.fillRect(x - R, sy - R, R * 2, R * 2);
+      }
+      const hl = ctx.createRadialGradient(x - R * 0.4, sy - R * 0.45, 0, x - R * 0.4, sy - R * 0.45, R * 0.6);
+      hl.addColorStop(0, `rgba(255,255,255,${0.45 * a})`);
+      hl.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = hl; ctx.fillRect(x - R, sy - R, R * 2, R * 2);
+      ctx.globalCompositeOperation = "source-over";
+      ctx.restore();
+
+      // rim light
+      ctx.strokeStyle = `rgba(210,222,248,${0.22 * a})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(x, sy, R, 0, 6.283); ctx.stroke();
+    }
+  }
+  function spawnPlanet() {
+    if (ended || sleepiness() > 0.78 || planets.length >= 6) return;
+    const r = 9 + Math.random() * 5;                  // same size as the sheep
+    const x = W * (0.2 + Math.random() * 0.6);
+    const screenY = H * (0.15 + Math.random() * 0.5); // fades in within view, then stays put in the sky
+    planets.push({
+      x, worldY: screenY - skyOffset, r,
+      hue: Math.random() * 6.28, tilt: (Math.random() - 0.5) * 0.9,
+      ring: Math.random() < 0.5, discovered: false,
+      bob: Math.random() * 6.28, born: clock,
+    });
+  }
+  function tryPlanet(x, y) {
+    for (const p of planets) {
+      if (p.discovered || p._sx == null) continue;
+      if (Math.hypot(x - p._sx, y - p._sy) < p.r + 20) {
+        p.discovered = true;
+        skyLabels.push({ x: p._sx, aboveY: p._sy - p.r - 10, belowY: p._sy + p.r + 10, name: nextPlanetName(), line1: "you just discovered", born: clock });
+        const v = Math.round(14 * light()); if (v > 0 && navigator.vibrate) navigator.vibrate(v);
+        return true;
+      }
+    }
+    return false;
+  }
+  function drawSkyLabels(lite) {
+    if (!skyLabels.length) return;
+    ctx.font = "italic 300 15px system-ui";
+    ctx.textAlign = "center";
+    const marginX = Math.max(22, W * 0.06);
+    const safeTop = Math.max(74, H * 0.09);
+    const safeBottom = H - Math.max(120, H * 0.13);
+    const lineH = 20, blockH = lineH * 2;
+    for (let i = skyLabels.length - 1; i >= 0; i--) {
+      const L = skyLabels[i];
+      const age = clock - L.born;
+      if (age > 5) { skyLabels.splice(i, 1); continue; }
+      const fin = Math.min(1, age / 0.6);
+      const fout = age > 4 ? Math.max(0, 5 - age) : 1;
+      const rise = Math.min(1, age / 1.2) * 12;
+      const a = fin * fout * 0.78 * lite;
+
+      const line1 = L.line1 || "you just discovered", line2 = L.name;
+      const halfW = Math.max(ctx.measureText(line1).width, ctx.measureText(line2).width) / 2 + 4;
+      const cx = Math.min(Math.max(L.x, marginX + halfW), W - marginX - halfW);
+
+      // sit above the planet; drop below if that would clip the top; then clamp fully inside
+      let topY = L.aboveY - rise - blockH;
+      if (topY < safeTop) topY = L.belowY + rise;
+      topY = Math.max(safeTop, Math.min(topY, safeBottom - blockH));
+
+      ctx.fillStyle = `rgba(216,222,242,${a})`;
+      ctx.fillText(line1, cx, topY + 15);
+      ctx.fillText(line2, cx, topY + 15 + lineH);
+    }
+    ctx.textAlign = "left";
+  }
+
+  // ---------- pinch-to-tear ----------
+  let tear = null; // { x, y, target, amt, healing }
+  function drawTear() {
+    if (!tear) return;
+    // ease toward target so it never feels stiff
+    tear.amt += (tear.target - tear.amt) * 0.16;
+    if (tear.healing && tear.amt < 0.015) { tear = null; return; }
+
+    const x = tear.x, y = tear.y;
+    const R = 30 + tear.amt * (H * 0.24);   // radius
+    const sx = 0.78;                         // gently oval, mostly round
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(sx, 1);
+
+    // the void: soft-edged, diffused into the sky (no hard rim)
+    let g = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
+    g.addColorStop(0.00, "rgba(2,3,6,0.97)");
+    g.addColorStop(0.55, "rgba(3,4,8,0.90)");
+    g.addColorStop(0.80, "rgba(6,8,14,0.45)");
+    g.addColorStop(1.00, "rgba(6,8,14,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(-R, -R, R * 2, R * 2);
+
+    // faint torn-edge light, also diffused
+    g = ctx.createRadialGradient(0, 0, R * 0.6, 0, 0, R);
+    g.addColorStop(0, "rgba(200,208,232,0)");
+    g.addColorStop(0.8, `rgba(200,208,232,${0.10 * Math.min(1, tear.amt * 2)})`);
+    g.addColorStop(1, "rgba(200,208,232,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(-R, -R, R * 2, R * 2);
+
+    // a few very distant faint stars, so it reads as depth, not a hole
+    ctx.fillStyle = `rgba(180,190,220,${0.12 * tear.amt})`;
+    for (let i = 0; i < 6; i++) {
+      const a = i * 1.7, rr = (i % 3) * R * 0.18;
+      ctx.fillRect(Math.cos(a) * rr, Math.sin(a) * rr, 1.3, 1.3);
+    }
+    ctx.restore();
+
+    // plain, honest line
+    if (tear.amt > 0.45 && !tear.healing) {
+      ctx.fillStyle = `rgba(206,212,232,${0.5 * Math.min(1, (tear.amt - 0.45) * 3)})`;
+      ctx.font = "300 14px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("nothing back here", x, y);
+      ctx.textAlign = "left";
+    }
+  }
+
+  // ---- main loop ----
+  let last = performance.now();
+  let clock = 0;
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    clock += dt * timeScale();
+    stepScroll();
+    const s = sleepiness();
+    const lite = light();
+
+    ctx.fillStyle = skyGradient(s);
+    ctx.fillRect(0, 0, W, H);
+
+    const hg = (1 - s) * 0.5;
+    if (hg > 0.01) {
+      const g = ctx.createRadialGradient(W * 0.5, H * 1.15, 0, W * 0.5, H * 1.15, H * 0.7);
+      g.addColorStop(0, `rgba(150,150,178,${0.28 * hg})`);
+      g.addColorStop(1, "rgba(150,150,178,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, H * 0.4, W, H * 0.6);
+    }
+
+    drawStars(clock, s, lite);
+    drawClouds(s, lite);
+    drawPlanet(dt, lite);
+    drawDoneCons(clock, lite);
+    drawCreate(clock, lite);
+    maybeComet(s);
+    drawComet(lite);
+    drawBursts(clock, lite);
+    updateFlock(dt, lite);
+    drawFloatNums(lite);
+    drawSkyLabels(lite);
+    drawTear();
+
+    if (s >= 1 && !ended) lightsOut();
+    requestAnimationFrame(frame);
+  }
+
+  // ---- custom kinetic scroll: finger drives the sky, release glides on momentum ----
+  let firstScroll = true;
+  let dragging = false, dragLastY = 0, dragLastT = 0, dragVel = 0;
+  let scrollMom = 0;
+  let traceMode = false, traceLastX = 0, traceLastY = 0;
+  const FRICTION = 0.975;   // long & floaty
+  const MAXMOM = 65;        // px/frame cap, so a hard fling can't warp
+
+  // distance from a point to a line segment (so a fast sweep still catches every star)
+  function distToSeg(px, py, ax, ay, bx, by) {
+    const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+    let t = l2 ? ((px - ax) * dx + (py - ay) * dy) / l2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+  }
+
+  // is the touch pressing on one of the pulsing stars we're offering to join?
+  function starUnder(x, y) {
+    if (!createCand || creating) return null;
+    for (const b of createCand.stars) { const sy = b.worldY + skyOffset; if (Math.hypot(x - b.x, y - sy) < 44) return b; }
+    return null;
+  }
+
+  function handleFirstScroll() {
+    if (!firstScroll) return;
+    firstScroll = false;
+    introEl.style.opacity = "0";
+    refreshEl.style.opacity = "1";
+    setTimeout(() => { refreshEl.style.opacity = "0"; }, 4200);
+  }
+  // momentum is integrated each frame in stepScroll(), called from the render loop
+  function stepScroll() {
+    if (!dragging && scrollMom !== 0) {
+      skyOffset += scrollMom * scrollDir;
+      scrollMom *= FRICTION;
+      if (Math.abs(scrollMom) < 0.05) scrollMom = 0;
+    }
+  }
+
+  // scroll-direction toggle (Reddit's #1 ask): let people choose which way feels right
+  const flipEl = document.getElementById("flip");
+  flipEl.addEventListener("click", (e) => {
+    e.stopPropagation();
+    scrollDir = -scrollDir;
+    try { localStorage.setItem("ss_dir", String(scrollDir)); } catch (err) {}
+    flipEl.style.color = "rgba(236,240,250,0.95)";
+    setTimeout(() => { flipEl.style.color = ""; }, 300);
+  });
+
+  // ---- taps (double tap) + pinch (tear) ----
+  let lastTap = 0, lastX = 0, lastY = 0;
+  let tStart = 0, tX = 0, tY = 0, moved = false, multi = false;
+  let pinchStart = 0, pinchMidX = 0, pinchMidY = 0;
+
+  function burstAt(x, y) {
+    const b = { x, worldY: y - skyOffset, born: clock, intensity: light(), ph: Math.random() * 6.28 };
+    bursts.push(b);
+    if (bursts.length > 140) bursts.shift();
+    const v = Math.round(18 * light());
+    if (v > 0 && navigator.vibrate) navigator.vibrate(v);
+    checkCluster();
+  }
+  function tap(x, y) {
+    if (tryPlanet(x, y)) return;         // tapping a planet discovers it
+    if (trySheep(x, y)) return;          // tapping a sheep counts it
+    const now = performance.now();
+    if (now - lastTap < 300 && Math.hypot(x - lastX, y - lastY) < 44) { burstAt(x, y); lastTap = 0; }
+    else { lastTap = now; lastX = x; lastY = y; }
+  }
+  function dist2(t) { return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY); }
+
+  scroller.addEventListener("touchstart", (e) => {
+    if (e.touches.length >= 2) {
+      if (traceMode && creating) { createCand = { stars: creating.stars, born: clock }; creating = null; }
+      traceMode = false;
+      multi = true; dragging = false; scrollMom = 0;
+      pinchStart = dist2(e.touches);
+      pinchMidX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      pinchMidY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      tear = { x: pinchMidX, y: pinchMidY, amt: 0, target: 0, healing: false };
+      e.preventDefault();
+    } else {
+      const t = e.touches[0];
+      tStart = performance.now(); tX = t.clientX; tY = t.clientY; moved = false; multi = false;
+      scrollMom = 0;   // catch a moving sky so it stops under your finger
+      const hit = starUnder(t.clientX, t.clientY);
+      if (hit) {
+        // press on a pulsing star -> begin tracing (not scrolling)
+        traceMode = true;
+        traceLastX = t.clientX; traceLastY = t.clientY;
+        creating = { stars: createCand.stars, order: [hit], closed: false };
+        createCand = null;
+        showDotsPrompt(true);
+        dragging = false;
+        e.preventDefault();
+      } else {
+        dragging = true; dragLastY = t.clientY; dragLastT = tStart; dragVel = 0;
+      }
+    }
+  }, { passive: false });
+
+  scroller.addEventListener("touchmove", (e) => {
+    if (e.touches.length >= 2 && tear) {
+      const d = dist2(e.touches);
+      tear.x = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      tear.y = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      tear.target = Math.max(0, Math.min(1, (d - pinchStart) / 240));
+      tear.healing = false;
+      e.preventDefault();
+    } else if (traceMode && creating && e.touches[0]) {
+      const t = e.touches[0];
+      const cxp = t.clientX, cyp = t.clientY;
+      for (const b of creating.stars) {
+        if (creating.order.indexOf(b) === -1) {
+          const sy = b.worldY + skyOffset;
+          // check the whole segment the finger swept, not just where it is now
+          if (distToSeg(b.x, sy, traceLastX, traceLastY, cxp, cyp) < 38) {
+            creating.order.push(b);
+            const v = Math.round(9 * light()); if (v > 0 && navigator.vibrate) navigator.vibrate(v);
+          }
+        }
+      }
+      traceLastX = cxp; traceLastY = cyp;
+      e.preventDefault();
+    } else if (dragging && e.touches[0]) {
+      const t = e.touches[0];
+      const now = performance.now();
+      const y = t.clientY;
+      const dy = y - dragLastY;
+      const dtm = Math.max(1, now - dragLastT);
+      skyOffset += dy * scrollDir;                       // 1:1 with the finger
+      dragVel = dragVel * 0.6 + (dy / dtm) * 0.4;         // smoothed px/ms for the fling
+      dragLastY = y; dragLastT = now;
+      if (Math.hypot(t.clientX - tX, y - tY) > 8) { moved = true; handleFirstScroll(); }
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  scroller.addEventListener("touchend", (e) => {
+    if (traceMode) {
+      traceMode = false;
+      if (creating && creating.order.length >= 3) {
+        const f = creating.order[0];
+        const fsy = f.worldY + skyOffset;
+        if (Math.hypot(traceLastX - f.x, traceLastY - fsy) < 34) creating.closed = true;  // lifted on the first star -> sealed loop
+        completeCreate();
+      } else if (creating) { createCand = { stars: creating.stars, born: clock }; creating = null; showDotsPrompt(true); }
+      if (e.touches.length === 0) { dragging = false; multi = false; goFullscreen(); }
+      return;
+    }
+    if (tear && e.touches.length < 2) { tear.healing = true; tear.target = 0; }
+    if (e.touches.length === 1) {
+      // dropped from two fingers to one: re-arm the drag from the finger that remains
+      const t = e.touches[0];
+      dragging = true; dragLastY = t.clientY; dragLastT = performance.now(); dragVel = 0;
+      moved = true; multi = true;
+    } else if (e.touches.length === 0) {
+      if (!multi && !moved && performance.now() - tStart < 450) {
+        tap(tX, tY);
+      } else if (dragging) {
+        let m = dragVel * 16.67;                          // px/ms -> px/frame
+        scrollMom = Math.max(-MAXMOM, Math.min(MAXMOM, m));
+      }
+      dragging = false; multi = false;
+      goFullscreen();
+    }
+  }, { passive: false });
+
+  scroller.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    skyOffset += e.deltaY * scrollDir * 0.6;
+    handleFirstScroll();
+  }, { passive: false });
+
+  scroller.addEventListener("dblclick", (e) => burstAt(e.clientX, e.clientY));
+
+  let fsTried = false;
+  function goFullscreen() {
+    if (fsTried) return; fsTried = true;
+    const el = document.documentElement;
+    const fn = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (fn) { try { fn.call(el); } catch (e) {} }
+  }
+
+  // ---------- DMs ----------
+  const DMS = [
+    // discovery hints (surfaced first, in order)
+    { from: "themoon", text: "tap twice. i won't tell anyone." },
+    { from: "thesky", text: "pinch and zoom. there's nothing back here." },
+    // the rest, shuffled at runtime
+    { from: "themoon", text: "so ja na" },
+    { from: "themoon", text: "thoongu, kanna" },
+    { from: "themoon", text: "kannu moodu" },
+    { from: "themoon", text: "kal dekh lenge" },
+    { from: "themoon", text: "if you turn this off now, the sky will still twinkle" },
+    { from: "themoon", text: "i'll keep the light on. go." },
+    { from: "themoon", text: "bas thodi der aur, phir so jao" },
+    { from: "themoon", text: "shona, phone niche rakho" },
+    { from: "themoon", text: "i've seen this side of you before. it's fine." },
+    { from: "themoon", text: "still up? me too. always." },
+    { from: "themoon", text: "the tide is going out. go with it." },
+    { from: "themoon", text: "old light is reaching you now. rest in it." },
+    { from: "themoon", text: "raat lambi hai. so jao." },
+    { from: "themoon", text: "i have moved oceans. i can move you under too." },
+    { from: "themoon", text: "i keep the same watch every night. sleep is your half of it." },
+    { from: "thetime", text: "deep breath, count to four, let it go" },
+    { from: "thetime", text: "u up? no reason." },
+    { from: "thetime", text: "it's late. that's all. it's just late." },
+    { from: "thetime", text: "nothing is due tonight" },
+    { from: "thetime", text: "3am says hi. 3am says sleep." },
+    { from: "thetime", text: "you've read every one of these. that's enough for tonight." },
+    { from: "thetime", text: "the hours don't need you to watch them" },
+    { from: "thetime", text: "every hour forgives the one before. so can you." },
+    { from: "thetime", text: "the clock unwinds whether or not you hold it." },
+    { from: "thetime", text: "this minute asks nothing. neither will the next." },
+    { from: "thetime", text: "somewhere it is already morning. not here. not yet." },
+    { from: "thenightshift", text: "the night shift has it from here" },
+    { from: "thenightshift", text: "clocked in. you can clock out." },
+    { from: "thenightshift", text: "we'll handle the dark. rest." },
+    { from: "thenightshift", text: "go off duty" },
+    { from: "thenightshift", text: "shift change. the stars take it from here." },
+    { from: "thenightshift", text: "nothing happened while you were scrolling. good." },
+    { from: "thenightshift", text: "we sweep the dark so you don't have to." },
+    { from: "thenightshift", text: "the dark is staffed tonight. you may leave your post." },
+    { from: "thenightshift", text: "the constellations keep their own hours. rest." },
+    { from: "thesky", text: "a cloud passed. it thought of you." },
+    { from: "thesky", text: "star no. {n} blinked at you" },
+    { from: "thesky", text: "a sheep went by. did you count it?" },
+    { from: "thesky", text: "the horizon sends its regards" },
+    { from: "thesky", text: "a little world drifted by. did you catch it?" },
+    { from: "thesky", text: "another sheep. no rush." },
+    { from: "thesky", text: "cloud cover tonight. rest easy." },
+    { from: "thesky", text: "the stars you can see left home a long time ago." },
+    { from: "thesky", text: "a small weather of sleep is moving in." },
+    { from: "thesky", text: "dust settles, light settles. so should you." },
+    { from: "thesky", text: "a cloud is only the sky breathing out. breathe with it." },
+    { from: "nobody", text: "seen. no reply needed." },
+    { from: "nobody", text: "nothing much happens here" },
+    { from: "nobody", text: "you're all caught up. there was nothing to catch." },
+    { from: "nobody", text: "delivered to no one. read by the moon." },
+    { from: "nobody", text: "0 people are looking for you right now. it's peaceful." },
+    { from: "nobody", text: "the silence isn't empty. it's holding you." },
+    { from: "nobody", text: "no one wrote. the quiet did." },
+    { from: "nobody", text: "you've reached the end of the noise." },
+    { from: "nobody", text: "here, even the notifications are asleep." },
+  ];
+  const AV = {
+    themoon: ["#e8d9a8", "#b7a56a"],
+    thetime: ["#8b93a8", "#565d72"],
+    thenightshift: ["#3a4780", "#222c52"],
+    thesky: ["#9fb0d8", "#6675a0"],
+    nobody: ["#5a5f70", "#3a3f4d"],
+  };
+
+  // queue: first two are the discovery hints (in order), then a shuffled bag of the rest
+  let queue = [], lastDMIdx = -1;
+  function refillQueue() {
+    const rest = DMS.slice(2).map((_, i) => i + 2);
+    for (let i = rest.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0;[rest[i], rest[j]] = [rest[j], rest[i]]; }
+    if (rest[rest.length - 1] === lastDMIdx && rest.length > 1) { const t = rest[0]; rest[0] = rest[rest.length - 1]; rest[rest.length - 1] = t; }
+    queue = rest;
+  }
+  refillQueue();
+  let hintsShown = 0;
+
+  function nextDMIndex() {
+    if (hintsShown < 2) return hintsShown++;         // 0 then 1
+    if (queue.length === 0) refillQueue();
+    return (lastDMIdx = queue.pop());
+  }
+
+  function showDM() {
+    if (ended) return;
+    const d = DMS[nextDMIndex()];
+    const text = d.text.replace("{n}", (1000 + Math.floor(Math.random() * 8000)).toLocaleString());
+    const g = AV[d.from] || AV.nobody;
+    const el = document.createElement("div");
+    el.className = "dm";
+    el.innerHTML =
+      `<div class="av" style="background:linear-gradient(135deg,${g[0]},${g[1]})"></div>` +
+      `<div class="body"><div class="top"><span class="from">@${d.from}</span><span class="when">now</span></div><div class="msg"></div></div>`;
+    el.querySelector(".msg").textContent = text;
+    dmsEl.appendChild(el);
+    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add("show")));
+    setTimeout(() => { el.classList.remove("show"); setTimeout(() => el.remove(), 800); }, 5200);
+    while (dmsEl.children.length > 2) dmsEl.firstChild.remove();
+  }
+
+  // DMs more often than v1; taper with the night
+  // ---- the governor: one quiet thing at a time, with breaths between ----
+  // the sky is "busy" while a flock crosses, a comet streaks, or you're making a constellation
+  function skyBusy() {
+    if (flock || comet || createCand || creating) return true;
+    for (const p of planets) if (!p.discovered && clock - p.born < 2.5) return true;   // a planet still easing in
+    return false;
+  }
+  // DMs are peripheral (top-right) — give them their own gentle cadence, not gated behind sky-events
+  let dmTimer = null;
+  function scheduleDM() {
+    if (ended) return;
+    const s = sleepiness();
+    if (s > 0.85) return;
+    const base = 30000 + Math.random() * 26000;   // ~30–56s
+    dmTimer = setTimeout(() => { if (!ended) showDM(); scheduleDM(); }, base * (1 + s * 0.8));
+  }
+  // sky-events (a flock OR a planet) stay one-at-a-time with breaths between
+  function pickEvent() { return Math.random() < 0.5 ? "sheep" : "planet"; }
+  let eventTimer = null;
+  function runEvent() {
+    eventTimer = null;
+    if (ended || sleepiness() > 0.85) return;
+    if (skyBusy()) { eventTimer = setTimeout(runEvent, 4000); return; }   // wait out whatever's happening
+    if (pickEvent() === "sheep") spawnFlock(); else spawnPlanet();
+    scheduleEvent();
+  }
+  function scheduleEvent() {
+    clearTimeout(eventTimer);
+    const s = sleepiness();
+    eventTimer = setTimeout(runEvent, (17000 + Math.random() * 22000) * (1 + s * 1.1));   // ~17–39s
+  }
+  // reliable early spawns: wait out a busy sky rather than skipping
+  function spawnFlockSoon() { if (ended) return; if (skyBusy()) { setTimeout(spawnFlockSoon, 3500); return; } spawnFlock(); }
+  function spawnPlanetSoon() { if (ended) return; if (skyBusy()) { setTimeout(spawnPlanetSoon, 3500); return; } spawnPlanet(); }
+
+  function lightsOut() {
+    ended = true;
+    clearTimeout(eventTimer); clearTimeout(dmTimer);
+    planets = []; createCand = null; creating = null;
+    sheepPrompt.style.opacity = "0";
+    showDotsPrompt(false);
+    scroller.style.overflow = "hidden";
+    scroller.style.pointerEvents = "none";
+    endEl.classList.add("on");
+    setTimeout(() => { endEl.querySelector(".e1").style.opacity = "0.92"; }, 900);
+    setTimeout(() => { endEl.querySelector(".e2").style.opacity = "0.6"; }, 3400);
+    setTimeout(() => { const o = endEl.querySelector(".over"); o.style.opacity = "0.7"; o.style.borderColor = "rgba(150,160,196,0.28)"; }, 5400);
+  }
+  document.getElementById("over").addEventListener("click", () => location.reload());
+
+  function init() {
+    resize();
+    requestAnimationFrame(frame);
+    const scrollPrompt = document.getElementById("scrollPrompt");
+    setTimeout(() => { if (firstScroll) introEl.style.opacity = "0.55"; }, 9000);
+    // start slow, one thing at a time:
+    setTimeout(() => { if (!ended) showDM(); }, 11000);   // "tap twice" — teaches the double tap
+    // a gentle nudge to keep drifting, then it fades
+    setTimeout(() => { if (!ended) scrollPrompt.style.opacity = "0.7"; }, 30000);
+    setTimeout(() => { scrollPrompt.style.opacity = "0"; }, 40000);
+    setTimeout(() => { if (!ended) showDM(); }, 44000);   // "pinch and zoom" — the second gesture
+    setTimeout(spawnFlockSoon, 56000);    // first sheep so counting is discovered
+    setTimeout(scheduleDM, 60000);        // then the moon keeps whispering, ~ every minute
+    setTimeout(spawnPlanetSoon, 76000);   // first planet so discovery is found
+    setTimeout(scheduleEvent, 92000);     // governor keeps sheep + planets coming, one at a time
+  }
+
+  let rz;
+  window.addEventListener("resize", () => {
+    clearTimeout(rz);
+    rz = setTimeout(() => { resize(); }, 200);
+  });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) last = performance.now(); });
+
+  init();
+})();
+</script>
+</body>
+</html>
